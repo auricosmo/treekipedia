@@ -18,6 +18,8 @@ Dynamic Environment: A responsive canvas featuring sky gradients, drifting cloud
 
 Exclusive Growth: Clicking a root automatically focuses the view by collapsing irrelevant siblings, keeping your discovery path clear.
 
+<br>
+
 🛠️ Tech Stack
 
 Engine: D3.js for hierarchical tree layouts and smooth SVG transitions.
@@ -30,6 +32,8 @@ Data: Wikipedia API (Action=Parse and Action=Query) for real-time content fetchi
 
 Typography: Inter (Sans-serif) for UI and Lora (Serif) for the Field Journal.
 
+<br>
+
 🚀 How to Run Locally
 
 Since Treekipedia is built as a single-file application, it is incredibly easy to set up.
@@ -39,6 +43,8 @@ Download the Code: Save the index.html file to your computer.
 Open in Browser: Double-click index.html.
 
 No Installation Required: All dependencies (D3, Tailwind, Lucide) are loaded via CDN, so no npm install is necessary for a quick start.
+
+<br>
 
 📂 Project Structure
 
@@ -52,6 +58,8 @@ initCanvas(): Sets up the multi-layered SVG environment (Sky, Grass, Dirt).
 
 updateTree(): The core D3 rendering loop that handles the "growth" animations and organic transitions.
 
+<br>
+
 🌲 Aesthetics
 
 The Great Tree: A majestic, swaying canopy representing your primary search.
@@ -61,6 +69,8 @@ The Roots: Tapered, woody tendrils that grow as you explore deeper.
 The Soil: A deep brown gradient peppered with pebbles and stones that appear as you scroll down.
 
 The Sky: A bright, floating environment with drifting clouds.
+
+<br>
 
 📜 License
 

@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Treekipedia | The Tree of Knowledge</title>
+    
+    <!-- FAVICON (Browser Tab Icon) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌳</text></svg>">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -39,11 +43,10 @@
             to { stroke-dashoffset: 0; }
         }
 
-        /* SVG Cloud Sway Animation */
-        .svg-cloud {
-            animation: cloud-float 25s infinite ease-in-out;
+        .animate-cloud {
+            animation: float 25s infinite ease-in-out;
         }
-        @keyframes cloud-float {
+        @keyframes float {
             0%, 100% { transform: translateX(0); }
             50% { transform: translateX(100px); }
         }
@@ -63,7 +66,6 @@
             box-shadow: 0 15px 30px rgba(0,0,0,0.3);
         }
 
-        /* Sidebar Specific: Ensure clean typography */
         #topic-summary p {
             margin-bottom: 1.5rem;
         }
@@ -75,15 +77,15 @@
     <header class="absolute top-0 left-0 right-0 p-6 z-20 flex flex-col md:flex-row gap-6 items-center justify-between pointer-events-none">
         <div class="flex items-center gap-4 pointer-events-auto group">
             <div class="bg-white/95 p-3 rounded-2xl shadow-2xl transform group-hover:rotate-12 transition-transform duration-500">
-                <i data-lucide="trees" class="w-8 h-8 text-green-700"></i>
+                <i data-lucide="tree-pine" class="w-10 h-10 text-green-700"></i>
             </div>
             <div>
                 <h1 class="text-3xl font-black tracking-tighter text-white drop-shadow-lg">Treekipedia</h1>
-                <p class="text-[10px] text-white font-black tracking-[0.4em] uppercase opacity-90">Nature's Library</p>
+                <p class="text-[10px] text-white font-black tracking-[0.4em] uppercase opacity-90">Rooted in Fact</p>
             </div>
         </div>
 
-        <div class="relative w-full max-w-lg pointer-events-auto">
+        <div class="relative w-full max-lg pointer-events-auto">
             <i data-lucide="search" class="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-sky-600"></i>
             <input 
                 id="search-input"
@@ -112,22 +114,30 @@
             <div class="absolute bottom-10 left-10 pointer-events-none">
                 <div class="px-6 py-4 bg-white/95 border-l-8 border-green-700 rounded-2xl shadow-2xl flex items-center gap-4 text-xs font-black text-green-900 uppercase tracking-widest">
                     <i data-lucide="sprout" class="w-6 h-6 text-green-700 animate-bounce"></i>
-                    Click any root to expand your understanding
+                    Grow your knowledge by exploring the roots
                 </div>
             </div>
         </main>
 
         <!-- SIDEBAR (JOURNAL) -->
-        <aside class="w-[500px] h-full bg-[#fdfcf5] border-l-[12px] border-[#2d1e1a]/10 shadow-[-20px_0_60px_rgba(0,0,0,0.1)] overflow-y-auto journal-scrollbar z-10">
+        <aside class="w-[500px] h-full bg-[#fdfcf5] border-l-[12px] border-[#2d1e1a]/10 shadow-[-20px_0_60px_rgba(0,0,0,0.15)] overflow-y-auto journal-scrollbar z-10">
             <div id="journal-content" class="flex flex-col h-full p-12 pt-36">
                 <div class="mb-14">
                     <div class="flex items-center gap-4 mb-6">
                         <div class="w-5 h-5 rounded-full bg-green-800/20 border-2 border-green-800 shadow-inner"></div>
                         <span class="text-xs font-black text-green-800 uppercase tracking-[0.6em]">Archival Record</span>
                     </div>
-                    <h3 id="topic-title" class="text-5xl font-serif font-black mb-8 tracking-tighter leading-tight italic text-[#2d1e1a]">
-                        Philippines
-                    </h3>
+                    
+                    <!-- Sidebar Icon and Title -->
+                    <div class="flex items-start gap-4 mb-8">
+                        <div id="sidebar-icon-container" class="p-4 bg-emerald-900/5 rounded-2xl border border-emerald-900/10">
+                             <i id="sidebar-icon" data-lucide="tree-pine" class="w-10 h-10 text-emerald-800"></i>
+                        </div>
+                        <h3 id="topic-title" class="text-5xl font-serif font-black tracking-tighter leading-tight italic text-[#2d1e1a]">
+                            Philippines
+                        </h3>
+                    </div>
+                    
                     <div class="h-1.5 w-32 bg-green-800/10 rounded-full"></div>
                 </div>
 
@@ -152,42 +162,57 @@
         // CONFIG & STATE
         let treeData = null;
         let centerTopic = "Philippines";
+        let mainSeedTopic = "Philippines";
         let isLoading = false;
 
         const svg = d3.select("#tree-svg");
         const container = d3.select("#canvas-container");
         let mainGroup, linksGroup, nodesGroup, zoom, decorationGroup, skyLayer;
 
-        // Wikipedia Cleanup Engine - HARDENED against CSS leaks
+        // HELPER: Get dynamic icon based on section name
+        function getSectionIcon(name) {
+            const lower = name.toLowerCase();
+            if (name === mainSeedTopic) return 'tree-pine';
+            if (lower.includes('etymology')) return 'languages';
+            if (lower.includes('history')) return 'history';
+            if (lower.includes('geography')) return 'map';
+            if (lower.includes('politic') || lower.includes('government')) return 'landmark';
+            if (lower.includes('economy')) return 'banknote';
+            if (lower.includes('demographic') || lower.includes('population')) return 'users';
+            if (lower.includes('culture')) return 'palette';
+            if (lower.includes('infrastructure') || lower.includes('transport')) return 'bus';
+            return 'book-open';
+        }
+
+        // Wikipedia Cleanup Engine - NUCLEAR EDITION
         function cleanWikiHtml(html) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             
-            // 1. Physically remove script and style tags
+            // 1. Remove all styles and scripts first
             doc.querySelectorAll('style, script').forEach(el => el.remove());
             
-            // 2. Identify and remove common Wikipedia administrative boxes and hatnotes
-            const garbage = [
+            // 2. Remove all Wikipedia UI and metadata noise
+            const selectorsToRemove = [
                 '.hatnote', '.metadata', '.navbox', '.vertical-navbox', 
                 '.infobox', '.reference', '.mw-editsection', '.noprint', '.ambox', 
                 '.mw-empty-elt', 'table', '.sistersitebox', '.thumb', '.mw-jump-link',
-                '.mw-parser-output style'
+                '.mw-parser-output style', '.reflist', '.shortdescription'
             ];
-            garbage.forEach(s => doc.querySelectorAll(s).forEach(el => el.remove()));
+            selectorsToRemove.forEach(s => doc.querySelectorAll(s).forEach(el => el.remove()));
             
-            // 3. AGGRESSIVE: Remove any element containing CSS code snippets
-            // This targets elements where the content looks like ".class { prop: val }"
-            doc.querySelectorAll('*').forEach(el => {
-                const text = el.textContent || "";
-                if ((text.includes('{') && text.includes('}') && text.includes(':')) || text.includes('.mw-parser-output')) {
+            // 3. ULTRA-AGGRESSIVE: Remove anything that contains brackets and colons (CSS patterns)
+            const allElements = doc.querySelectorAll('*');
+            for (let i = allElements.length - 1; i >= 0; i--) {
+                const el = allElements[i];
+                const content = el.textContent || "";
+                if ((content.includes('{') && content.includes('}') && content.includes(':')) || content.includes('.mw-')) {
                     el.remove();
                 }
-            });
+            }
 
-            // 4. Final Text Extraction
             let text = doc.body.textContent || "";
             
-            // 5. Regex Polish for citation markers [1][2] and leftovers
             return text
                 .replace(/\[edit\]/g, '')
                 .replace(/\[\d+\]/g, '')
@@ -293,6 +318,12 @@
             document.getElementById('topic-title').innerText = title;
             document.getElementById('topic-summary').innerText = summary || "Details are being unhearted for this root segment.";
             document.getElementById('wiki-link').href = `https://en.wikipedia.org/wiki/${title}`;
+            
+            // Update Icon
+            const iconName = getSectionIcon(title);
+            const iconEl = document.getElementById('sidebar-icon');
+            iconEl.setAttribute('data-lucide', iconName);
+            lucide.createIcons();
         }
 
         function setLoading(val) {
@@ -304,7 +335,6 @@
             mainGroup = svg.append("g").attr("class", "main-container");
             const defs = svg.append("defs");
             
-            // Gradients
             defs.append("linearGradient").attr("id", "skyGradient").attr("x1", "0%").attr("y1", "0%").attr("x2", "0%").attr("y2", "100%")
                 .selectAll("stop").data([{o: "0%", c: "#0288d1"}, {o: "100%", c: "#81d4fa"}]).enter().append("stop").attr("offset", d => d.o).attr("stop-color", d => d.c);
             
@@ -315,7 +345,6 @@
             skyLayer = mainGroup.append("g").attr("class", "sky-layer");
             skyLayer.append("rect").attr("y", -5000).attr("x", -bgW/2).attr("width", bgW).attr("height", 5000).attr("fill", "url(#skyGradient)");
             
-            // ADD CLOUDS INSIDE THE SKY LAYER SO THEY PAN AWAY FROM THE DIRT
             const cloudG = skyLayer.append("g").attr("class", "svg-cloud");
             cloudG.append("path").attr("d", "M-100,-300 Q-80,-340 -40,-320 Q0,-360 40,-320 Q80,-340 100,-300 Z").attr("fill", "white").attr("opacity", 0.4);
             cloudG.append("path").attr("d", "M400,-450 Q420,-490 460,-470 Q500,-510 540,-470 Q580,-490 600,-450 Z").attr("fill", "white").attr("opacity", 0.3);
@@ -324,7 +353,6 @@
             mainGroup.append("rect").attr("y", 10).attr("x", -bgW/2).attr("width", bgW).attr("height", 15000).attr("fill", "url(#dirtGradient)");
             mainGroup.append("rect").attr("y", 0).attr("x", -bgW/2).attr("width", bgW).attr("height", 15).attr("fill", "#2e7d32");
 
-            // Add Stones/Pebbles in dirt for texture
             const decorGroup = mainGroup.append("g").attr("class", "decor");
             for(let i=0; i<400; i++){
                 decorGroup.append("circle")
@@ -351,19 +379,17 @@
             const t = svg.transition().duration(1000).ease(d3.easeCubicInOut);
             const linkGen = d3.linkVertical().x(d => d.x).y(d => d.y);
 
-            // ORGANIC ROOT LINKS
             linksGroup.selectAll("path")
                 .data(root.links(), d => d.target.data.id)
                 .join(
                     enter => enter.append("path").attr("class", "link-tendril").attr("fill", "none")
-                        .attr("stroke", "#4e342e").attr("stroke-width", d => Math.max(3, 15 / (d.target.depth + 1))).attr("opacity", 0)
+                        .attr("stroke", "#4e342e").attr("stroke-width", 3).attr("opacity", 0)
                         .attr("d", d => { const o = {x: d.source.x, y: d.source.y}; return linkGen({source: o, target: o}); })
                         .call(e => e.transition(t).attr("opacity", 1).attr("d", linkGen)),
-                    update => update.call(u => u.transition(t).attr("d", linkGen).attr("stroke-width", d => Math.max(3, 15 / (d.target.depth + 1)))),
+                    update => update.call(u => u.transition(t).attr("d", linkGen)),
                     exit => exit.call(ex => ex.transition(t).attr("opacity", 0).remove())
                 );
 
-            // ORGANIC NODES (TREE & STONES)
             nodesGroup.selectAll("g.node-item")
                 .data(root.descendants(), d => d.data.id)
                 .join(
@@ -375,18 +401,14 @@
                         e.each(function(d) {
                             const el = d3.select(this);
                             if (d.depth === 0) {
-                                // SCALE TREE BIGGER
                                 const tree = el.append("g").attr("class", "tree-graphic").attr("transform", "translate(0,0)");
-                                // Thicker trunk
                                 tree.append("path").attr("d", "M-20,10 L20,10 L12,-100 L-12,-100 Z").attr("fill", "#5d4037");
-                                // Majestic Leaves/Canopy
                                 const canopy = tree.append("g").attr("class", "tree-canopy");
                                 canopy.append("circle").attr("r", 80).attr("cy", -110).attr("fill", "#388e3c");
                                 canopy.append("circle").attr("r", 65).attr("cx", -70).attr("cy", -90).attr("fill", "#43a047");
                                 canopy.append("circle").attr("r", 65).attr("cx", 70).attr("cy", -90).attr("fill", "#2e7d32");
                                 canopy.append("circle").attr("r", 55).attr("cx", 0).attr("cy", -170).attr("fill", "#4caf50");
                             } else {
-                                // STONE/ROOT BULB GRAPHIC
                                 const stone = el.append("g").attr("class", "stone-graphic");
                                 const r = d.depth === 1 ? 22 : 14;
                                 stone.append("circle")
@@ -426,6 +448,7 @@
                 const pageId = Object.keys(introRes.query.pages)[0];
                 const summary = introRes.query.pages[pageId].extract || "";
                 const sections = await fetchTOC(title);
+                mainSeedTopic = title;
                 treeData = { name: title, id: `root-${title.replace(/\s/g, '_')}`, children: sections, isSeed: true };
                 centerTopic = title;
                 updateSidebar(title, summary);
@@ -435,7 +458,6 @@
             }
         }
 
-        // STARTUP
         window.addEventListener('DOMContentLoaded', () => {
             initCanvas();
             initSeed(centerTopic);

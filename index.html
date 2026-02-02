@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Treekipedia | The Tree of Knowledge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            background: #81d4fa;
+        }
+        .font-serif { font-family: 'Lora', serif; }
+        
+        /* Custom scrollbar for the parchment sidebar */
+        .journal-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .journal-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .journal-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(45, 30, 26, 0.2);
+            border-radius: 10px;
+        }
+
+        /* Root growth animation */
+        .link-tendril {
+            stroke-dasharray: 1500;
+            stroke-dashoffset: 1500;
+            animation: grow-root 1.5s forwards cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes grow-root {
+            to { stroke-dashoffset: 0; }
+        }
+
+        /* Cloud animation */
+        .animate-cloud {
+            animation: float 20s infinite ease-in-out;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(30px); }
+        }
+
+        .node-card {
+            transition: all 0.4s ease;
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col">
+
+    <!-- HEADER -->
+    <header class="absolute top-0 left-0 right-0 p-6 z-20 flex flex-col md:flex-row gap-6 items-center justify-between pointer-events-none">
+        <div class="flex items-center gap-4 pointer-events-auto group">
+            <div class="bg-white/95 p-3 rounded-2xl shadow-2xl transform group-hover:rotate-12 transition-transform duration-500">
+                <i data-lucide="leaf" class="w-8 h-8 text-green-600"></i>
+            </div>
+            <div>
+                <h1 class="text-3xl font-black tracking-tighter text-white drop-shadow-lg">Treekipedia</h1>
+                <p class="text-[10px] text-white font-black tracking-[0.4em] uppercase opacity-90">Branch into Knowledge</p>
+            </div>
+        </div>
+
+        <div class="relative w-full max-w-lg pointer-events-auto">
+            <i data-lucide="search" class="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-sky-600"></i>
+            <input 
+                id="search-input"
+                type="text" 
+                placeholder="Plant a new topic tree..."
+                class="w-full bg-white/95 border-none rounded-full py-4 pl-16 pr-20 focus:outline-none focus:ring-4 focus:ring-green-400/50 transition-all text-lg shadow-2xl text-slate-800 font-bold"
+            >
+            <div id="loader" class="hidden absolute right-6 top-1/2 -translate-y-1/2">
+                <i data-lucide="loader-2" class="w-6 h-6 animate-spin text-green-600"></i>
+            </div>
+        </div>
+
+        <div class="hidden md:block pointer-events-auto px-8 py-3.5 bg-green-700 text-white rounded-full font-black uppercase text-xs shadow-2xl border-4 border-white/20">
+            Field Journal Active
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- CANVAS (TREE) -->
+        <main id="canvas-container" class="flex-1 relative cursor-grab active:cursor-grabbing bg-[#81d4fa]">
+            <div class="absolute top-24 left-[10%] opacity-40 animate-cloud pointer-events-none">
+                <i data-lucide="cloud" class="w-40 h-40 text-white fill-white"></i>
+            </div>
+            <div class="absolute top-48 right-[15%] opacity-30 animate-cloud pointer-events-none" style="animation-delay: -5s">
+                <i data-lucide="cloud" class="w-32 h-32 text-white fill-white"></i>
+            </div>
+
+            <svg id="tree-svg" class="w-full h-full block"></svg>
+
+            <!-- HUD -->
+            <div class="absolute bottom-10 left-10 pointer-events-none">
+                <div class="px-6 py-4 bg-white/95 border-l-8 border-green-500 rounded-2xl shadow-2xl flex items-center gap-4 text-xs font-black text-green-900 uppercase tracking-widest">
+                    <i data-lucide="sparkles" class="w-6 h-6 text-green-600 animate-bounce"></i>
+                    Click any root to update your field journal
+                </div>
+            </div>
+        </main>
+
+        <!-- SIDEBAR (JOURNAL) -->
+        <aside class="w-[500px] h-full bg-[#fdfcf5] border-l-[10px] border-emerald-900/10 shadow-[-20px_0_60px_rgba(0,0,0,0.15)] overflow-y-auto journal-scrollbar z-10">
+            <div id="journal-content" class="flex flex-col h-full p-12 pt-36">
+                <div class="mb-14">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-5 h-5 rounded-full bg-emerald-700/20 border-2 border-emerald-700 shadow-inner"></div>
+                        <span class="text-xs font-black text-emerald-800 uppercase tracking-[0.6em]">Archival Record</span>
+                    </div>
+                    <h3 id="topic-title" class="text-5xl font-serif font-black mb-8 tracking-tighter leading-tight italic text-[#2d1e1a]">
+                        Philippines
+                    </h3>
+                    <div class="h-1.5 w-32 bg-emerald-800/10 rounded-full"></div>
+                </div>
+
+                <div id="topic-summary" class="prose max-w-none text-[#3e2b26] leading-[2.1] text-xl font-medium whitespace-pre-wrap">
+                    Loading archives...
+                </div>
+
+                <div class="mt-auto pt-20">
+                    <a id="wiki-link" href="#" target="_blank" class="group flex items-center justify-between w-full p-10 bg-emerald-900/5 border border-emerald-900/10 rounded-[40px] hover:bg-emerald-900/10 transition-all duration-500">
+                        <div class="flex flex-col">
+                            <span class="text-xs text-emerald-800/50 uppercase font-black tracking-widest mb-2">Reference Source</span>
+                            <span class="text-2xl font-serif font-black text-[#2d1e1a]">View Library Document</span>
+                        </div>
+                        <i data-lucide="chevron-right" class="w-10 h-10 group-hover:translate-x-4 transition-transform text-emerald-700"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // CONFIG & STATE
+        let treeData = null;
+        let centerTopic = "Philippines";
+        let isLoading = false;
+
+        const svg = d3.select("#tree-svg");
+        const container = d3.select("#canvas-container");
+        let mainGroup, linksGroup, nodesGroup, zoom;
+
+        // WIKIPEDIA CLEANER
+        function cleanWikiHtml(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Remove style blocks, scripts, and meta elements
+            const garbage = [
+                'style', 'script', '.hatnote', '.metadata', '.navbox', '.vertical-navbox', 
+                '.infobox', '.reference', '.mw-editsection', '.noprint', '.ambox', 
+                '.mw-empty-elt', 'table', '.sistersitebox', '.thumb', '.mw-jump-link',
+                '.mw-parser-output style' // Target the specific CSS leak shown in screenshot
+            ];
+            garbage.forEach(s => doc.querySelectorAll(s).forEach(el => el.remove()));
+            
+            // Deep scrub for any text that looks like CSS
+            doc.querySelectorAll('*').forEach(el => {
+                if (el.textContent.includes('{') && el.textContent.includes('}') && el.textContent.includes(':')) {
+                    el.remove();
+                }
+            });
+
+            let text = doc.body.textContent || "";
+            return text
+                .replace(/\[edit\]/g, '')
+                .replace(/\[\d+\]/g, '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+        }
+
+        // DATA FETCHERS
+        async function fetchTOC(title) {
+            const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&origin=*`;
+            const res = await fetch(url).then(r => r.json());
+            if (!res.parse || !res.parse.sections) return [];
+            return res.parse.sections
+                .filter(s => s.toclevel === 1)
+                .map(s => ({
+                    name: s.line,
+                    id: `sec-${s.index}-${title.replace(/\s/g, '_')}`,
+                    children: [],
+                    isSection: true,
+                    sectionIndex: s.index
+                })).slice(0, 10);
+        }
+
+        async function fetchSectionLinks(pageTitle, sectionIndex, sectionName) {
+            const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(pageTitle)}&section=${sectionIndex}&prop=links|text&format=json&origin=*`;
+            const res = await fetch(url).then(r => r.json());
+            if (!res.parse) return [];
+            
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(res.parse.text['*'], 'text/html');
+            const anchors = Array.from(doc.querySelectorAll('p a, li a'));
+            
+            const unique = new Set();
+            const results = [];
+            for (const a of anchors) {
+                const t = a.getAttribute('title');
+                if (t && !t.includes(':') && t.length > 2 && !unique.has(t)) {
+                    unique.add(t);
+                    results.push({
+                        name: t,
+                        id: `link-${t}-${sectionName}-${pageTitle}`.replace(/\s/g, '_'),
+                        children: []
+                    });
+                }
+            }
+            return results.slice(0, 7);
+        }
+
+        // TREE ENGINE
+        async function growTree(node, depth) {
+            if (node.children && node.children.length > 0) {
+                // Collapse logic
+                const findAndCollapse = (curr) => {
+                    if (curr.id === node.id) { curr.children = []; return true; }
+                    if (curr.children) for (let c of curr.children) if (findAndCollapse(c)) return true;
+                    return false;
+                };
+                findAndCollapse(treeData);
+                updateTree();
+                return;
+            }
+
+            if (isLoading) return;
+            setLoading(true);
+
+            try {
+                let children = [];
+                let summary = "";
+
+                if (depth === 1) {
+                    children = await fetchSectionLinks(treeData.name, node.sectionIndex, node.name);
+                    const res = await fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(treeData.name)}&section=${node.sectionIndex}&prop=text&format=json&origin=*`).then(r => r.json());
+                    summary = cleanWikiHtml(res.parse?.text?.['*'] || "");
+                } else if (depth > 1) {
+                    const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts|links&titles=${encodeURIComponent(node.name)}&pllimit=50&format=json&origin=*&explaintext=1&exintro=1`).then(r => r.json());
+                    const pageId = Object.keys(res.query.pages)[0];
+                    summary = res.query.pages[pageId].extract || "";
+                    children = (res.query.pages[pageId].links || [])
+                        .filter(l => l.ns === 0)
+                        .map(l => ({ name: l.title, id: `deep-${l.title}-${node.name}`.replace(/\s/g, '_'), children: [] }))
+                        .slice(0, 5);
+                }
+
+                const findAndExpand = (curr) => {
+                    if (curr.children && curr.children.some(c => c.id === node.id)) {
+                        curr.children.forEach(s => {
+                            if (s.id === node.id) s.children = children;
+                            else s.children = [];
+                        });
+                        return true;
+                    }
+                    if (curr.children) for (let c of curr.children) if (findAndExpand(c)) return true;
+                    return false;
+                };
+                findAndExpand(treeData);
+                
+                centerTopic = node.name;
+                updateSidebar(node.name, summary);
+                updateTree();
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function updateSidebar(title, summary) {
+            document.getElementById('topic-title').innerText = title;
+            document.getElementById('topic-summary').innerText = summary || "No details found for this root.";
+            document.getElementById('wiki-link').href = `https://en.wikipedia.org/wiki/${title}`;
+        }
+
+        function setLoading(val) {
+            isLoading = val;
+            document.getElementById('loader').classList.toggle('hidden', !val);
+        }
+
+        function initCanvas() {
+            mainGroup = svg.append("g").attr("class", "main-container");
+            const defs = svg.append("defs");
+            
+            defs.append("linearGradient").attr("id", "skyGradient").attr("x1", "0%").attr("y1", "0%").attr("x2", "0%").attr("y2", "100%")
+                .selectAll("stop").data([{o: "0%", c: "#0288d1"}, {o: "100%", c: "#81d4fa"}]).enter().append("stop").attr("offset", d => d.o).attr("stop-color", d => d.c);
+            
+            defs.append("linearGradient").attr("id", "dirtGradient").attr("x1", "0%").attr("y1", "0%").attr("x2", "0%").attr("y2", "100%")
+                .selectAll("stop").data([{o: "0%", c: "#3e2723"}, {o: "100%", c: "#1a0f0d"}]).enter().append("stop").attr("offset", d => d.o).attr("stop-color", d => d.c);
+
+            const bgW = 20000;
+            mainGroup.append("rect").attr("y", -5000).attr("x", -bgW/2).attr("width", bgW).attr("height", 5000).attr("fill", "url(#skyGradient)");
+            mainGroup.append("rect").attr("y", 10).attr("x", -bgW/2).attr("width", bgW).attr("height", 10000).attr("fill", "url(#dirtGradient)");
+            mainGroup.append("rect").attr("y", 0).attr("x", -bgW/2).attr("width", bgW).attr("height", 12).attr("fill", "#4CAF50");
+
+            linksGroup = mainGroup.append("g").attr("class", "links-group");
+            nodesGroup = mainGroup.append("g").attr("class", "nodes-group");
+
+            zoom = d3.zoom().scaleExtent([0.1, 2.5]).on("zoom", (e) => mainGroup.attr("transform", e.transform));
+            svg.call(zoom);
+            
+            const w = document.getElementById('canvas-container').clientWidth;
+            svg.call(zoom.transform, d3.zoomIdentity.translate(w / 2, 250).scale(0.7));
+        }
+
+        function updateTree() {
+            const treeLayout = d3.tree().nodeSize([320, 280]);
+            const root = d3.hierarchy(treeData);
+            treeLayout(root);
+
+            const t = svg.transition().duration(800).ease(d3.easeCubicInOut);
+            const linkGen = d3.linkVertical().x(d => d.x).y(d => d.y);
+
+            // LINKS
+            linksGroup.selectAll("path")
+                .data(root.links(), d => d.target.data.id)
+                .join(
+                    enter => enter.append("path").attr("class", "link-tendril").attr("fill", "none").attr("stroke", "#5d4037").attr("stroke-width", 3).attr("opacity", 0)
+                        .attr("d", d => { const o = {x: d.source.x, y: d.source.y}; return linkGen({source: o, target: o}); })
+                        .call(e => e.transition(t).attr("opacity", 1).attr("d", linkGen)),
+                    update => update.call(u => u.transition(t).attr("d", linkGen)),
+                    exit => exit.call(ex => ex.transition(t).attr("opacity", 0).remove())
+                );
+
+            // NODES
+            nodesGroup.selectAll("g.node-item")
+                .data(root.descendants(), d => d.data.id)
+                .join(
+                    enter => {
+                        const e = enter.append("g").attr("class", "node-item").attr("cursor", "pointer")
+                            .attr("transform", d => `translate(${d.parent ? d.parent.x : d.x}, ${d.parent ? d.parent.y : d.y})`)
+                            .on("click", (ev, d) => growTree(d.data, d.depth));
+
+                        e.each(function(d) {
+                            const el = d3.select(this);
+                            if (d.depth === 0) {
+                                el.append("circle").attr("r", 35).attr("fill", "#8bc34a").attr("stroke", "#558b2f").attr("stroke-width", 4);
+                                el.append("path").attr("d", "M-14,-10 Q0,-30 14,-10").attr("stroke", "#fff").attr("fill", "none").attr("stroke-width", 3);
+                            } else {
+                                el.append("circle").attr("r", 15).attr("fill", d.depth === 1 ? "#3e2723" : "#212121").attr("stroke", "#795548").attr("stroke-width", 2);
+                            }
+                        });
+
+                        const fo = e.append("foreignObject").attr("x", -120).attr("y", 45).attr("width", 240).attr("height", 200).style("overflow", "visible");
+                        fo.append("xhtml:div").attr("class", "card-container flex justify-center").html(d => `
+                            <div class="p-4 rounded-2xl border-2 shadow-2xl backdrop-blur-xl transition-all duration-500 text-center text-sm font-black leading-tight w-[210px] min-h-[48px]
+                                 ${d.depth === 0 ? 'bg-white text-green-900' : 'bg-[#36281e] text-[#efebe9]'}
+                                 ${d.data.name === centerTopic ? 'border-[#8bc34a] shadow-[0_0_25px_rgba(139,195,74,0.6)]' : 'border-white/10'}">
+                                ${d.data.name}
+                            </div>
+                        `);
+                        return e.transition(t).attr("transform", d => `translate(${d.x},${d.y})`).attr("opacity", 1);
+                    },
+                    update => update.call(u => {
+                        u.transition(t).attr("transform", d => `translate(${d.x},${d.y})`);
+                        u.select(".card-container div")
+                            .attr("class", d => `p-4 rounded-2xl border-2 shadow-2xl backdrop-blur-xl transition-all duration-500 text-center text-sm font-black leading-tight w-[210px] min-h-[48px]
+                                 ${d.depth === 0 ? 'bg-white text-green-900' : 'bg-[#36281e] text-[#efebe9]'}
+                                 ${d.data.name === centerTopic ? 'border-[#8bc34a] shadow-[0_0_25px_rgba(139,195,74,0.6)]' : 'border-white/10'}`);
+                    }),
+                    exit => exit.call(ex => ex.transition(t).attr("opacity", 0).remove())
+                );
+        }
+
+        async function initSeed(title) {
+            setLoading(true);
+            try {
+                const introRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&titles=${encodeURIComponent(title)}&format=json&origin=*&explaintext=1&exintro=1`).then(r => r.json());
+                const pageId = Object.keys(introRes.query.pages)[0];
+                const summary = introRes.query.pages[pageId].extract || "";
+                
+                const sections = await fetchTOC(title);
+                treeData = { name: title, id: `root-${title.replace(/\s/g, '_')}`, children: sections, isSeed: true };
+                centerTopic = title;
+                
+                updateSidebar(title, summary);
+                updateTree();
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // STARTUP
+        window.addEventListener('DOMContentLoaded', () => {
+            initCanvas();
+            initSeed(centerTopic);
+            lucide.createIcons();
+
+            document.getElementById('search-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') initSeed(e.target.value);
+            });
+        });
+    </script>
+</body>
+</html>

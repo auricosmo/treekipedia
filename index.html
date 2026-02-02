@@ -120,7 +120,7 @@
         </main>
 
         <!-- SIDEBAR (JOURNAL) -->
-        <aside class="w-[500px] h-full bg-[#fdfcf5] border-l-[12px] border-[#2d1e1a]/10 shadow-[-20px_0_60px_rgba(0,0,0,0.15)] overflow-y-auto journal-scrollbar z-10">
+        <aside class="w-[500px] h-full bg-[#fdfcf5] border-l-[12px] border-[#2d1e1a]/10 shadow-[-20px_0_60px_rgba(0,0,0,0.1)] overflow-y-auto journal-scrollbar z-10">
             <div id="journal-content" class="flex flex-col h-full p-12 pt-36">
                 <div class="mb-14">
                     <div class="flex items-center gap-4 mb-6">
@@ -134,7 +134,7 @@
                              <i id="sidebar-icon" data-lucide="tree-pine" class="w-10 h-10 text-emerald-800"></i>
                         </div>
                         <h3 id="topic-title" class="text-5xl font-serif font-black tracking-tighter leading-tight italic text-[#2d1e1a]">
-                            Philippines
+                            Wikipedia
                         </h3>
                     </div>
                     
@@ -160,10 +160,13 @@
 
     <script>
         // CONFIG & STATE
+        let centerTopic = "Wikipedia";
+        let mainSeedTopic = "Wikipedia";
         let treeData = null;
-        let centerTopic = "Philippines";
-        let mainSeedTopic = "Philippines";
         let isLoading = false;
+        
+        // In-memory cache to make re-searches and toggles instant
+        const wikiCache = new Map();
 
         const svg = d3.select("#tree-svg");
         const container = d3.select("#canvas-container");
@@ -221,12 +224,22 @@
         }
 
         async function fetchTOC(title) {
+            const cacheKey = `toc-${title}`;
+            if (wikiCache.has(cacheKey)) return wikiCache.get(cacheKey);
+
+            // List of sections to exclude from the tree
+            const excludeList = [
+                "See also", "Notes", "References", 
+                "Further reading", "External links", "Play Audio",
+                "Works cited", "Sources", "Citations"
+            ];
+
             const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&origin=*`;
             try {
                 const res = await fetch(url).then(r => r.json());
                 if (!res.parse || !res.parse.sections) return [];
-                return res.parse.sections
-                    .filter(s => s.toclevel === 1)
+                const sections = res.parse.sections
+                    .filter(s => s.toclevel === 1 && !excludeList.includes(s.line))
                     .map(s => ({
                         name: s.line,
                         id: `sec-${s.index}-${title.replace(/\s/g, '_')}`,
@@ -234,10 +247,16 @@
                         isSection: true,
                         sectionIndex: s.index
                     })).slice(0, 10);
+                
+                wikiCache.set(cacheKey, sections);
+                return sections;
             } catch(e) { return []; }
         }
 
         async function fetchSectionLinks(pageTitle, sectionIndex, sectionName) {
+            const cacheKey = `links-${pageTitle}-${sectionIndex}`;
+            if (wikiCache.has(cacheKey)) return wikiCache.get(cacheKey);
+
             const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(pageTitle)}&section=${sectionIndex}&prop=links|text&format=json&origin=*`;
             try {
                 const res = await fetch(url).then(r => r.json());
@@ -258,7 +277,9 @@
                         });
                     }
                 }
-                return results.slice(0, 7);
+                const filtered = results.slice(0, 7);
+                wikiCache.set(cacheKey, filtered);
+                return filtered;
             } catch(e) { return []; }
         }
 
@@ -280,18 +301,42 @@
             try {
                 let children = [];
                 let summary = "";
+                
                 if (depth === 1) {
-                    children = await fetchSectionLinks(treeData.name, node.sectionIndex, node.name);
-                    const res = await fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(treeData.name)}&section=${node.sectionIndex}&prop=text&format=json&origin=*`).then(r => r.json());
-                    summary = cleanWikiHtml(res.parse?.text?.['*'] || "");
+                    const sectionTextKey = `sectionText-${treeData.name}-${node.sectionIndex}`;
+                    
+                    const [linksData, textData] = await Promise.all([
+                        fetchSectionLinks(treeData.name, node.sectionIndex, node.name),
+                        wikiCache.has(sectionTextKey) 
+                            ? Promise.resolve(wikiCache.get(sectionTextKey))
+                            : fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(treeData.name)}&section=${node.sectionIndex}&prop=text&format=json&origin=*`)
+                                .then(r => r.json())
+                                .then(res => {
+                                    const cleaned = cleanWikiHtml(res.parse?.text?.['*'] || "");
+                                    wikiCache.set(sectionTextKey, cleaned);
+                                    return cleaned;
+                                })
+                    ]);
+                    
+                    children = linksData;
+                    summary = textData;
                 } else if (depth > 1) {
-                    const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts|links&titles=${encodeURIComponent(node.name)}&pllimit=50&format=json&origin=*&explaintext=1&exintro=1`).then(r => r.json());
-                    const pageId = Object.keys(res.query.pages)[0];
-                    summary = res.query.pages[pageId].extract || "";
-                    children = (res.query.pages[pageId].links || [])
-                        .filter(l => l.ns === 0)
-                        .map(l => ({ name: l.title, id: `deep-${l.title}-${node.name}`.replace(/\s/g, '_'), children: [] }))
-                        .slice(0, 5);
+                    const deepKey = `deep-${node.name}`;
+                    if (wikiCache.has(deepKey)) {
+                        const cached = wikiCache.get(deepKey);
+                        children = cached.children;
+                        summary = cached.summary;
+                    } else {
+                        const res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts|links&titles=${encodeURIComponent(node.name)}&pllimit=50&format=json&origin=*&explaintext=1&exintro=1`).then(r => r.json());
+                        const pageId = Object.keys(res.query.pages)[0];
+                        summary = res.query.pages[pageId].extract || "";
+                        children = (res.query.pages[pageId].links || [])
+                            .filter(l => l.ns === 0)
+                            .map(l => ({ name: l.title, id: `deep-${l.title}-${node.name}`.replace(/\s/g, '_'), children: [] }))
+                            .slice(0, 5);
+                        
+                        wikiCache.set(deepKey, { children, summary });
+                    }
                 }
 
                 const findAndExpand = (curr) => {
@@ -442,15 +487,23 @@
         }
 
         async function initSeed(title) {
+            if (!title) return;
             setLoading(true);
+            
             try {
-                const introRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&titles=${encodeURIComponent(title)}&format=json&origin=*&explaintext=1&exintro=1`).then(r => r.json());
+                // Parallel fetching of Introduction and Table of Contents
+                const [introRes, sections] = await Promise.all([
+                    fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=extracts&titles=${encodeURIComponent(title)}&format=json&origin=*&explaintext=1&exintro=1`).then(r => r.json()),
+                    fetchTOC(title)
+                ]);
+
                 const pageId = Object.keys(introRes.query.pages)[0];
                 const summary = introRes.query.pages[pageId].extract || "";
-                const sections = await fetchTOC(title);
+                
                 mainSeedTopic = title;
                 treeData = { name: title, id: `root-${title.replace(/\s/g, '_')}`, children: sections, isSeed: true };
                 centerTopic = title;
+                
                 updateSidebar(title, summary);
                 updateTree();
             } catch(e) {} finally {

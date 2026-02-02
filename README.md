@@ -1,4 +1,4 @@
-🌳 Treekipedia
+🌳 Treekipedia https://auricosmo.github.io/treekipedia/
 
 Branch into Knowledge. Treekipedia is an interactive knowledge visualization tool that transforms Wikipedia articles into organic, growing "Trees of Knowledge." Instead of scrolling through text, you plant a topic and watch as its sections sprout into roots, allowing you to dig deep into the history, etymology, and details of any subject in a beautiful, nature-inspired environment.
 

@@ -413,11 +413,13 @@
             zoom = d3.zoom().scaleExtent([0.05, 3]).on("zoom", (e) => mainGroup.attr("transform", e.transform));
             svg.call(zoom);
             const w = document.getElementById('canvas-container').clientWidth;
-            svg.call(zoom.transform, d3.zoomIdentity.translate(w / 2, 250).scale(0.6));
+            // INCREASED INITIAL ZOOM to 1.0 (from 0.6) and adjusted Y translation
+            svg.call(zoom.transform, d3.zoomIdentity.translate(w / 2, 150).scale(1.0));
         }
 
         function updateTree() {
-            const treeLayout = d3.tree().nodeSize([380, 320]);
+            // TIGHTER NODE SPACING [260, 180] (previously [380, 320])
+            const treeLayout = d3.tree().nodeSize([260, 180]);
             const root = d3.hierarchy(treeData);
             treeLayout(root);
 
